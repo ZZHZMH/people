@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>湖北省人口数据可视化大屏</title>
+    <!-- 引入ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    color: #fff;
+    font-family: "Microsoft YaHei", sans-serif;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    background-color: #061029;
+    background-image:
+        linear-gradient(rgba(0,192,255,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,192,255,0.1) 1px, transparent 1px);
+    background-size: 30px 30px;
+    overflow: hidden;
+}
+
+.header {
+    height: 80px;
+    line-height: 80px;
+    text-align: center;
+    border-bottom: 1px solid rgba(0,192,255,0.3);
+}
+
+.header h1 {
+    font-size: 28px;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px #00c0ff;
+}
+
+.time {
+    position: absolute;
+    right: 40px;
+    top: 25px;
+    font-size: 18px;
+    color: #26f0ff;
+}
+
+.main-box {
+    display: flex;
+    width: 100%;
+    height: calc(100vh - 140px);
+    padding: 20px;
+    gap: 20px;
+}
+
+.left-box, .right-box {
+    width: 23%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.center-box {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card {
+    width: 100%;
+    height: 48%;
+    background: rgba(0,30,80,0.4);
+    border: 1px solid rgba(0,192,255,0.4);
+    border-radius: 6px;
+    box-shadow: 0 0 12px rgba(0,192,255,0.2);
+    padding: 10px;
+}
+
+.big-card {
+    height: 100%;
+}
+
+.map-card {
+    width: 100%;
+    flex: 1;
+    background: rgba(0,30,80,0.4);
+    border: 1px solid rgba(0,192,255,0.4);
+    border-radius: 6px;
+    box-shadow: 0 0 12px rgba(0,192,255,0.2);
+    padding: 10px;
+}
+
+.footer {
+    height: 60px;
+    line-height: 60px;
+    text-align: center;
+    border-top: 1px solid rgba(0,192,255,0.2);
+    font-size: 14px;
+    color: #89a8d8;
+}
+
+.btn-bar {
+    width: 100%;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.btn-bar button {
+    padding: 8px 24px;
+    background: rgba(0,192,255,0.2);
+    border: 1px solid #00c0ff;
+    border-radius: 4px;
+    color: #00c0ff;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-bar button:hover {
+    background: rgba(0,192,255,0.4);
+    box-shadow: 0 0 15px rgba(0,192,255,0.5);
+}
+
+    </style>
+</head>
+<body>
+    <!-- 顶部标题栏 -->
+    <header class="header">
+        <h1>湖北省人口综合数据可视化大屏</h1>
+        <div class="time" id="nowTime"></div>
+    </header>
+
+    <!-- 主体区域 -->
+    <div class="main-box">
+        <!-- 左侧：城乡人口占比 + 常住人口城市柱状图 -->
+        <div class="left-box">
+            <div class="chart-card" id="cityPie"></div>
+            <div class="chart-card" id="rankBar"></div>
+        </div>
+        <!-- 中间核心：湖北省人口地图 -->
+        <div class="center-box">
+            <div class="map-card" id="hubeiMap"></div>
+            <!-- 按钮栏 -->
+            <div class="btn-bar">
+                <button id="switchBtn">切换成热力图显示</button>
+                <button onclick="window.location.href='index.html'">返回全国大屏</button>
+            </div>
+        </div>
+        <!-- 右侧：近六年总人口折线图 + 年龄结构雷达图 -->
+        <div class="right-box">
+            <div class="chart-card" id="lineChart"></div>
+            <div class="chart-card" id="ageRadar"></div>
+        </div>
+    </div>
+
+    <!-- 底部信息栏 -->
+    <footer class="footer">
+        数据来源：湖北省统计局 | 数据年份：2024年末 | 最后更新时间：<span id="updateTime"></span>
+    </footer>
+
+    <script>
+
+function setTime() {
+    let now = new Date();
+    document.getElementById("nowTime").innerText = now.toLocaleString();
+    document.getElementById("updateTime").innerText = now.toLocaleString();
+}
+setTime();
+setInterval(setTime, 1000);
+
+// 湖北省各市人口数据
+var hubeiCityData = [
+    {name:'武汉市', value: 1380.91},
+    {name:'黄冈市', value: 579.42},
+    {name:'襄阳市', value: 527.97},
+    {name:'荆州市', value: 508.29},
+    {name:'孝感市', value: 414.61},
+    {name:'宜昌市', value: 390.06},
+    {name:'恩施土家族苗族自治州', value: 335.23},
+    {name:'十堰市', value: 312.45},
+    {name:'咸宁市', value: 258.93},
+    {name:'荆门市', value: 253.43},
+    {name:'黄石市', value: 243.53},
+    {name:'随州市', value: 198.83},
+    {name:'天门市', value: 107.74},
+    {name:'仙桃市', value: 107.25},
+    {name:'鄂州市', value: 106.88},
+    {name:'潜江市', value: 83.09},
+    {name:'神农架林区', value: 5.79}
+];
+
+// 湖北省各区县人口热力图数据 [经度, 纬度, 人口(万人), 名称]
+var heatmapScatterData = [
+    [114.30,30.59,175.32,'洪山区'],[114.21,30.57,127.23,'武昌区'],
+    [114.28,30.63,149.57,'江岸区'],[114.22,30.62,91.45,'江汉区'],
+    [114.16,30.62,87.84,'硚口区'],[114.38,30.47,168.36,'江夏区'],
+    [114.04,30.55,175.13,'东西湖区'],[114.41,30.64,159.66,'青山区'],
+    [113.85,30.53,95.21,'蔡甸区'],[114.09,30.67,67.32,'汉阳区'],
+    [114.53,30.71,46.87,'新洲区'],[116.75,30.40,36.95,'黄陂区'],
+    [113.84,30.38,70.52,'汉南区'],
+    [114.87,30.45,103.42,'黄州区'],[115.68,30.73,58.76,'麻城市'],
+    [115.82,30.25,62.41,'黄梅县'],[115.04,30.72,71.83,'红安县'],
+    [115.32,30.41,57.23,'浠水县'],[114.98,30.30,82.15,'蕲春县'],
+    [115.58,30.06,45.67,'武穴市'],[115.21,31.01,56.34,'大悟县'],
+    [114.62,31.18,41.61,'团风县'],
+    [112.14,32.04,135.68,'襄城区'],[112.18,32.07,82.34,'樊城区'],
+    [112.08,32.16,62.51,'襄州区'],[111.50,31.77,58.37,'南漳县'],
+    [112.63,31.75,96.83,'枣阳市'],[111.67,32.29,57.42,'谷城县'],
+    [112.09,31.52,34.82,'宜城市'],
+    [112.24,30.33,56.67,'沙市区'],[112.19,30.35,45.31,'荆州区'],
+    [112.58,30.18,93.42,'监利市'],[112.90,30.12,63.58,'洪湖市'],
+    [111.76,30.17,53.82,'松滋市'],[112.23,30.07,82.16,'公安县'],
+    [112.42,30.39,58.15,'江陵县'],[111.95,30.43,55.18,'石首市'],
+    [111.28,30.69,72.35,'西陵区'],[111.37,30.71,41.24,'伍家岗区'],
+    [111.09,30.83,56.87,'夷陵区'],[111.50,30.38,48.63,'枝江市'],
+    [111.76,30.53,52.41,'当阳市'],[110.75,30.63,38.56,'长阳县'],
+    [110.42,30.31,36.21,'五峰县'],[111.48,31.03,43.79,'远安县'],
+    [113.93,30.92,67.45,'孝南区'],[113.69,31.17,83.56,'安陆市'],
+    [113.37,31.18,75.23,'应城市'],[114.15,30.93,62.18,'汉川市'],
+    [113.56,30.84,56.34,'云梦县'],[113.81,31.62,69.85,'大悟县'],
+    [110.80,32.65,65.43,'茅箭区'],[110.78,32.68,38.76,'张湾区'],
+    [110.81,32.99,52.34,'郧阳区'],[110.22,32.28,46.82,'房县'],
+    [109.97,32.65,38.45,'竹山县'],[110.42,33.07,35.67,'郧西县'],
+    [110.15,32.74,34.98,'竹溪县'],[111.07,32.41,48.36,'丹江口市'],
+    [114.32,29.88,63.24,'咸安区'],[113.85,29.72,48.56,'赤壁市'],
+    [114.58,29.72,42.13,'通山县'],[114.22,29.52,38.67,'崇阳县'],
+    [113.78,29.55,34.52,'通城县'],[114.82,29.98,31.81,'嘉鱼县'],
+    [112.20,31.03,55.46,'东宝区'],[112.21,30.98,27.53,'掇刀区'],
+    [112.58,31.02,68.32,'钟祥市'],[113.16,30.92,62.74,'京山市'],
+    [112.10,30.78,39.38,'沙洋县'],
+    [115.04,30.20,48.67,'黄石港区'],[114.97,30.18,35.42,'西塞山区'],
+    [114.89,30.22,52.31,'下陆区'],[115.16,30.06,28.64,'铁山区'],
+    [114.76,29.97,78.49,'大冶市'],[115.22,29.83,42.56,'阳新县'],
+    [113.38,31.69,98.42,'曾都区'],[113.82,31.83,62.37,'广水市'],
+    [112.89,31.54,38.04,'随县'],
+    [109.47,30.30,83.24,'恩施市'],[109.48,30.76,52.36,'建始县'],
+    [110.15,30.05,45.67,'巴东县'],[108.94,30.30,38.76,'利川市'],
+    [109.12,29.67,42.53,'来凤县'],[109.73,30.04,35.87,'宣恩县'],
+    [108.76,29.52,28.46,'咸丰县'],[110.34,29.87,8.34,'鹤峰县'],
+    [113.17,30.66,107.74,'天门市'],[113.44,30.36,107.25,'仙桃市'],
+    [114.89,30.39,106.88,'鄂州市'],[112.90,30.42,83.09,'潜江市'],
+    [110.68,31.74,5.79,'神农架林区']
+];
+
+var mapChart = echarts.init(document.getElementById('hubeiMap'));
+var isHeatmap = false;
+
+fetch('https://geo.datav.aliyun.com/areas_v3/bound/420000_full.json')
+    .then(response => response.json())
+    .then(geoJson => {
+        echarts.registerMap('hubei', geoJson);
+        renderMap();
+    })
+    .catch(err => {
+        console.error('地图数据加载失败，尝试备用:', err);
+        fetch('https://geojson.cn/api/data/420000.json')
+            .then(response => response.json())
+            .then(geoJson => {
+                echarts.registerMap('hubei', geoJson);
+                renderMap();
+            });
+    });
+
+function renderMap() {
+    var mapOption = {
+        title: { 
+            text: '湖北省各市常住人口分布', 
+            left: 'center', 
+            top: 10,
+            textStyle: { color: '#fff', fontSize: 18 } 
+        },
+        tooltip: { 
+            trigger: 'item',
+            formatter: function(params) {
+                if (params.value) {
+                    return params.name + '<br/>常住人口：' + params.value + ' 万人';
+                }
+                return params.name;
+            }
+        },
+        visualMap: { 
+            min: 0, 
+            max: 1400, 
+            left: 10, 
+            bottom: 10, 
+            text: ['高','低'], 
+            textStyle: { color: '#fff' },
+            color: ['#00c0ff','#081838'],
+            show: true
+        },
+        series: [{
+            type: 'map',
+            map: 'hubei',
+            roam: false,
+            label: { 
+                show: true, 
+                color: '#fff', 
+                fontSize: 10,
+                formatter: function(params) {
+                    var n = params.name;
+                    return n.replace('市','').replace('土家族苗族自治州','').replace('林区','');
+                }
+            },
+            emphasis: {
+                label: { show: true, color: '#fff', fontSize: 14, fontWeight: 'bold' },
+                itemStyle: { areaColor: '#00c0ff' }
+            },
+            data: hubeiCityData
+        }]
+    };
+    mapChart.setOption(mapOption, true);
+}
+
+function renderHeatmap() {
+    // 生成密集热力点数据，围绕各区县中心扩散
+    var heatData = [];
+    heatmapScatterData.forEach(function(item) {
+        var lng = item[0], lat = item[1], pop = item[2];
+        heatData.push([lng, lat, pop]);
+        var count = Math.floor(pop / 8);
+        for (var i = 0; i < count; i++) {
+            var angle = Math.random() * Math.PI * 2;
+            var radius = Math.random() * 0.15 * (1 + pop / 200);
+            var nlng = lng + Math.cos(angle) * radius;
+            var nlat = lat + Math.sin(angle) * radius * 0.8;
+            var nval = pop * (0.3 + Math.random() * 0.5) * (1 - Math.min(radius / 0.3, 0.8));
+            heatData.push([nlng, nlat, Math.max(nval, 2)]);
+        }
+    });
+
+    var heatmapOption = {
+        title: { 
+            text: '湖北省人口分布热力图', 
+            left: 'center', 
+            top: 10,
+            textStyle: { color: '#fff', fontSize: 18 } 
+        },
+        tooltip: { 
+            trigger: 'item',
+            formatter: function(params) {
+                if (params.value && params.value[2]) {
+                    return '人口密度：' + params.value[2].toFixed(1) + ' 万人';
+                }
+                return '';
+            }
+        },
+        geo: {
+            map: 'hubei',
+            roam: false,
+            label: { 
+                show: true, 
+                color: 'rgba(255,255,255,0.8)', 
+                fontSize: 10,
+                formatter: function(params) {
+                    var n = params.name;
+                    return n.replace('市','').replace('土家族苗族自治州','').replace('林区','');
+                }
+            },
+            itemStyle: { 
+                areaColor: 'rgba(10,31,61,0.6)', 
+                borderColor: 'rgba(0,192,255,0.5)', 
+                borderWidth: 1 
+            },
+            emphasis: {
+                label: { show: true, color: '#fff', fontSize: 12 },
+                itemStyle: { areaColor: 'rgba(10,31,61,0.8)' }
+            }
+        },
+        visualMap: {
+            min: 0, max: 180, left: 10, bottom: 10,
+            text: ['密集', '稀疏'], textStyle: { color: '#fff' },
+            inRange: { 
+                color: ['#0000ff', '#0040ff', '#00bfff', '#00ff80', '#80ff00', '#ffff00', '#ffbf00', '#ff8000', '#ff0000']
+            },
+            show: true, calculable: true
+        },
+        series: [{
+            name: '人口热力',
+            type: 'heatmap',
+            coordinateSystem: 'geo',
+            data: heatData,
+            pointSize: 18,
+            blurSize: 25,
+            minOpacity: 0.4,
+            maxOpacity: 0.85
+        }]
+    };
+    mapChart.setOption(heatmapOption, true);
+}
+
+// 切换按钮
+document.getElementById('switchBtn').addEventListener('click', function() {
+    isHeatmap = !isHeatmap;
+    if (isHeatmap) {
+        renderHeatmap();
+        this.innerText = '切换成省图显示';
+    } else {
+        renderMap();
+        this.innerText = '切换成热力图显示';
+    }
+});
+
+// 1. 城乡人口占比饼状图
+let cityPie = echarts.init(document.getElementById('cityPie'));
+let pieOption = {
+    title: { text: '城乡人口占比', left: 'center', textStyle: { color: '#fff', fontSize: 16 } },
+    tooltip: { trigger: 'item', formatter: '{b}: {c} 万人 ({d}%)' },
+    legend: {
+        bottom: '5%',
+        textStyle: { color: '#fff', fontSize: 12 }
+    },
+    series: [{
+        type: 'pie',
+        radius: ['30%','55%'],
+        center: ['50%', '45%'],
+        data: [
+            {name:'城镇人口', value: 3871, itemStyle:{color:'#00c0ff'}},
+            {name:'乡村人口', value: 1963, itemStyle:{color:'#39ff99'}}
+        ],
+        label: { 
+            color: '#fff',
+            formatter: '{b}\n{d}%'
+        }
+    }]
+};
+cityPie.setOption(pieOption);
+
+// 2. 常住人口城市柱状图
+let rankBar = echarts.init(document.getElementById('rankBar'));
+let rankOption = {
+    title: { 
+        text: '常住人口TOP10城市', 
+        left: 'center', 
+        textStyle: { color: '#fff', fontSize: 16 } 
+    },
+    tooltip: { trigger: 'axis', formatter: '{b}: {c} 万人' },
+    grid: {
+        left: '18%',   
+        right: '8%',
+        top: '14%',
+        bottom: '10%',
+        containLabel: false
+    },
+    yAxis: { 
+        type: 'category', 
+        data: ['武汉','黄冈','襄阳','荆州','孝感','宜昌','恩施','十堰','咸宁','荆门'],
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff', fontSize: 11, interval: 0 },
+        inverse: true
+    },
+    xAxis: { 
+        type: 'value',
+        name: '万人',
+        nameTextStyle: { color: '#fff' },
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff', fontSize: 11 },
+        splitLine: { lineStyle: { color: 'rgba(0,192,255,0.1)' } }
+    },
+    series: [{
+        type: 'bar',
+        data: [1380.91, 579.42, 527.97, 508.29, 414.61, 390.06, 335.23, 312.45, 258.93, 253.43],
+        itemStyle: { 
+            color: new echarts.graphic.LinearGradient(0,0,1,0,[
+                {offset:0,color:'#9d5cff'},{offset:1,color:'#39ff99'}
+            ])
+        },
+        barWidth: '60%'
+    }]
+};
+rankBar.setOption(rankOption);
+
+// 3. 近六年全省总人口折线图
+let lineChart = echarts.init(document.getElementById('lineChart'));
+let lineOption = {
+    title: { 
+        text: '近6年湖北省总人口', 
+        left: 'center', 
+        textStyle: { color: '#fff', fontSize: 16 } 
+    },
+    tooltip: { trigger: 'axis', formatter: '{b}年: {c} 万人' },
+    grid: {
+        left: '18%',  
+        right: '8%',
+        bottom: '18%',
+        top: '18%',
+        containLabel: false
+    },
+    xAxis: {
+        type: 'category',
+        data: ['2020','2021','2022','2023','2024','2025'],
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff', interval: 0 }
+    },
+    yAxis: {
+        type: 'value',
+        name: '万人',
+        nameTextStyle: { color: '#fff', padding: [0, 10, 0, 0] },
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff' },
+        splitLine: { lineStyle: { color: 'rgba(0,192,255,0.1)' } },
+        min: 5700,
+        max: 5900
+    },
+    series: [{
+        type: 'line', 
+        smooth: true,
+        data: [5775, 5830, 5844, 5838, 5834, 5811],
+        lineStyle: { color: '#00c0ff', width: 3 },
+        itemStyle: { color: '#26f0ff' },
+        areaStyle: { 
+            color: new echarts.graphic.LinearGradient(0,0,0,1,[
+                {offset:0,color:'rgba(0,192,255,0.6)'},{offset:1,color:'rgba(0,192,255,0)'}
+            ])
+        },
+        markPoint: {
+            data: [
+                {type: 'max', name: '最大值'},
+                {type: 'min', name: '最小值'}
+            ],
+            label: { color: '#fff' }
+        }
+    }]
+};
+lineChart.setOption(lineOption);
+
+// 4. 人口年龄结构雷达图
+let ageRadar = echarts.init(document.getElementById('ageRadar'));
+let radarOption = {
+    title: {
+        text: '人口年龄结构',
+        left: 'center',
+        top: 5, 
+        textStyle: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+    },
+    tooltip: { trigger: 'item' },
+    radar: {
+        center: ['50%', '58%'], 
+        radius: '52%', 
+        indicator: [
+            { name: '0-14岁', max: 25 },
+            { name: '15-34岁', max: 30 },
+            { name: '35-59岁', max: 40 },
+            { name: '60-74岁', max: 25 },
+            { name: '75岁以上', max: 10 }
+        ],
+        axisLine: { lineStyle: { color: 'rgba(0,192,255,0.4)' } },
+        splitLine: { lineStyle: { color: 'rgba(0,192,255,0.2)' } },
+        axisName: { color: '#fff', fontSize: 11, padding: 5 },
+        splitArea: { show: false }
+    },
+    series: [{
+        type: 'radar',
+        data: [{
+            value: [15.8, 22.6, 34.5, 19.8, 7.3],
+            name: '湖北省年龄占比(%)',
+            areaStyle: { color: 'rgba(0,192,255,0.3)' },
+            lineStyle: { color: '#00c0ff', width: 2 },
+            itemStyle: { color: '#26f0ff', borderColor: '#fff', borderWidth: 2 },
+            symbol: 'circle',
+            symbolSize: 8
+        }]
+    }]
+};
+ageRadar.setOption(radarOption);
+
+window.addEventListener('resize',()=>{
+    lineChart.resize();
+    rankBar.resize();
+    mapChart.resize();
+    cityPie.resize();
+    ageRadar.resize();
+});
+
+    </script>
+</body>
+</html>

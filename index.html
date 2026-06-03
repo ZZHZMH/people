@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全国人口数据可视化大屏</title>
+    <!-- 引入ECharts & 全国地图 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/map/js/china.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    color: #fff;
+    font-family: "Microsoft YaHei", sans-serif;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    background-color: #061029;
+    background-image:
+        linear-gradient(rgba(0,192,255,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,192,255,0.1) 1px, transparent 1px);
+    background-size: 30px 30px;
+    overflow: hidden;
+}
+
+.header {
+    height: 80px;
+    line-height: 80px;
+    text-align: center;
+    border-bottom: 1px solid rgba(0,192,255,0.3);
+}
+
+.header h1 {
+    font-size: 28px;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px #00c0ff;
+}
+
+.time {
+    position: absolute;
+    right: 40px;
+    top: 25px;
+    font-size: 18px;
+    color: #26f0ff;
+}
+
+.main-box {
+    display: flex;
+    width: 100%;
+    height: calc(100vh - 140px);
+    padding: 20px;
+    gap: 20px;
+}
+
+.left-box, .right-box {
+    width: 23%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.center-box {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card {
+    width: 100%;
+    height: 48%;
+    background: rgba(0,30,80,0.4);
+    border: 1px solid rgba(0,192,255,0.4);
+    border-radius: 6px;
+    box-shadow: 0 0 12px rgba(0,192,255,0.2);
+    padding: 10px;
+}
+
+.big-card {
+    height: 100%;
+}
+
+.map-card {
+    width: 100%;
+    flex: 1;
+    background: rgba(0,30,80,0.4);
+    border: 1px solid rgba(0,192,255,0.4);
+    border-radius: 6px;
+    box-shadow: 0 0 12px rgba(0,192,255,0.2);
+    padding: 10px;
+}
+
+.footer {
+    height: 60px;
+    line-height: 60px;
+    text-align: center;
+    border-top: 1px solid rgba(0,192,255,0.2);
+    font-size: 14px;
+    color: #89a8d8;
+}
+
+.btn-bar {
+    width: 100%;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.btn-bar button {
+    padding: 8px 24px;
+    background: rgba(0,192,255,0.2);
+    border: 1px solid #00c0ff;
+    border-radius: 4px;
+    color: #00c0ff;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-bar button:hover {
+    background: rgba(0,192,255,0.4);
+    box-shadow: 0 0 15px rgba(0,192,255,0.5);
+}
+
+    </style>
+</head>
+<body>
+    <!-- 顶部标题栏 -->
+    <header class="header">
+        <h1>全国人口综合数据可视化大屏</h1>
+        <div class="time" id="nowTime"></div>
+    </header>
+
+    <!-- 主体区域 -->
+    <div class="main-box">
+        <!-- 左侧：历年人口趋势 + 省份排名 -->
+        <div class="left-box">
+            <div class="chart-card" id="lineChart"></div>
+            <div class="chart-card" id="rankBar"></div>
+        </div>
+        <!-- 中间核心：全国人口地图 -->
+        <div class="center-box">
+            <div class="chart-card big-card" id="chinaMap"></div>
+        </div>
+        <!-- 右侧：城乡占比 + 年龄结构 -->
+        <div class="right-box">
+            <div class="chart-card" id="cityPie"></div>
+            <div class="chart-card" id="ageRadar"></div>
+        </div>
+    </div>
+
+    <!-- 底部信息栏 -->
+    <footer class="footer">
+        数据类型：全国人口模拟统计数据 | 最后更新时间：<span id="updateTime"></span> | 提示：双击湖北省区域可进入子页面查看详细数据
+    </footer>
+
+    <script>
+
+function setTime() {
+    let now = new Date();
+    document.getElementById("nowTime").innerText = now.toLocaleString();
+    document.getElementById("updateTime").innerText = now.toLocaleString();
+}
+setTime();-
+setInterval(setTime, 1000);
+
+// 1. 近六年全国总人口折线图
+let lineChart = echarts.init(document.getElementById('lineChart'));
+let lineOption = {
+    title: { 
+        text: '近6年全国总人口', 
+        left: 'center', 
+        textStyle: { color: '#fff', fontSize: 16 } 
+    },
+    tooltip: { trigger: 'axis' },
+    grid: {
+        left: '20%',  
+        right: '8%',
+        bottom: '18%',
+        containLabel: false
+    },
+    xAxis: {
+        type: 'category',
+        data: ['2020','2021','2022','2023','2024','2025'],
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff', interval: 0 }
+    },
+    yAxis: {
+        type: 'value',
+        name: '万人',
+        nameTextStyle: { color: '#fff', padding: [0, 10, 0, 0] },
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff' },
+        splitLine: { lineStyle: { color: 'rgba(0,192,255,0.1)' } },
+        min: 140000,
+        max: 142000
+    },
+    series: [{
+        type: 'line', 
+        smooth: true,
+        data: [141212, 141260, 141175, 140967, 140800, 140650],
+        lineStyle: { color: '#00c0ff' },
+        areaStyle: { 
+            color: new echarts.graphic.LinearGradient(0,0,0,1,[
+                {offset:0,color:'rgba(0,192,255,0.6)'},{offset:1,color:'rgba(0,192,255,0)'}
+            ])
+        }
+    }]
+};
+lineChart.setOption(lineOption);
+
+// 2. 省份人口排名
+let rankBar = echarts.init(document.getElementById('rankBar'));
+let rankOption = {
+    title: { 
+        text: '常住人口TOP10省份', 
+        left: 'center', 
+        textStyle: { color: '#fff', fontSize: 16 } 
+    },
+    tooltip: { trigger: 'axis' },
+    grid: {
+        left: '16%',   
+        right: '8%',
+        top: '12%',
+        bottom: '12%',
+        containLabel: false
+    },
+    yAxis: { 
+        type: 'category', 
+        data: ['广东','山东','河南','江苏','四川','河北','湖南','浙江','安徽','湖北'], 
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff', fontSize: 12, interval: 0, align: 'right' }
+    },
+    xAxis: { 
+        type: 'value', 
+        axisLine: { lineStyle: { color: '#00c0ff' } },
+        axisLabel: { color: '#fff', fontSize: 12 }
+    },
+    series: [{
+        type: 'bar',
+        data: [12706,10163,9872,8515,8374,7420,6604,6627,6127,5844],
+        itemStyle: { 
+            color: new echarts.graphic.LinearGradient(0,0,1,0,[
+                {offset:0,color:'#9d5cff'},{offset:1,color:'#39ff99'}
+            ])
+        }
+    }]
+};
+rankBar.setOption(rankOption);
+
+// 3. 全国地图
+let mapChart = echarts.init(document.getElementById('chinaMap'));
+let mapOption = {
+    title: { text: '全国各省常住人口分布', left: 'center', textStyle: { color: '#fff', fontSize: 20 } },
+    tooltip: { 
+        trigger: 'item',
+        formatter: function(params) {
+            return params.name + '<br/>常住人口：' + params.value + ' 万人';
+        }
+    },
+    visualMap: { min: 0, max: 12000, left: 'left', top: 'bottom', text: ['高','低'], 
+                 textStyle: { color: '#fff' }, color: ['#00c0ff','#081838'] },
+    series: [{
+        type: 'map',
+        map: 'china',
+        roam: false,
+        label: { show: false },
+        emphasis: {
+            label: { show: true, color: '#fff' },
+            itemStyle: { areaColor: '#00c0ff' }
+        },
+        data: [
+            {name:'北京',value:2189},{name:'天津',value:1387},{name:'河北',value:7420},
+            {name:'山西',value:3492},{name:'内蒙古',value:2405},{name:'辽宁',value:4229},
+            {name:'吉林',value:2375},{name:'黑龙江',value:3125},{name:'上海',value:2487},
+            {name:'江苏',value:8515},{name:'浙江',value:6627},{name:'安徽',value:6127},
+            {name:'福建',value:4187},{name:'江西',value:4517},{name:'山东',value:10163},
+            {name:'河南',value:9872},{name:'湖北',value:5834},{name:'湖南',value:6604},
+            {name:'广东',value:12706},{name:'广西',value:5037},{name:'海南',value:1020},
+            {name:'重庆',value:3212},{name:'四川',value:8374},{name:'贵州',value:3852},
+            {name:'云南',value:4690},{name:'西藏',value:365},{name:'陕西',value:3953},
+            {name:'甘肃',value:2490},{name:'青海',value:594},{name:'宁夏',value:725},
+            {name:'新疆',value:2589},{name:'台湾',value:2342},{name:'香港',value:750},
+            {name:'澳门',value:68},{name:'南海诸岛',value:0}
+        ]
+    }]
+};
+mapChart.setOption(mapOption);
+
+// 双击湖北省进入子页面
+mapChart.on('dblclick', function(params) {
+    if (params.name === '湖北') {
+        window.location.href = 'hubei.html';
+    }
+});
+
+// 鼠标悬浮提示
+mapChart.on('mouseover', function(params) {
+    if (params.name === '湖北') {
+        document.getElementById('chinaMap').title = '双击进入湖北省详细人口分布';
+    }
+});
+mapChart.on('mouseout', function(params) {
+    document.getElementById('chinaMap').title = '';
+});
+
+// 4. 城乡人口占比
+let cityPie = echarts.init(document.getElementById('cityPie'));
+let pieOption = {
+    title: { text: '城乡人口占比', left: 'center', textStyle: { color: '#fff', fontSize: 16 } },
+    tooltip: { trigger: 'item', formatter: '{b}: {c} 万人 ({d}%)' },
+    series: [{
+        type: 'pie',
+        radius: '60%',
+        data: [
+            {name:'城镇人口',value:92071, itemStyle:{color:'#00c0ff'}},
+            {name:'乡村人口',value:48579, itemStyle:{color:'#39ff99'}}
+        ],
+        label: { color: '#fff' }
+    }]
+};
+cityPie.setOption(pieOption);
+
+// 5. 人口年龄结构雷达图
+let ageRadar = echarts.init(document.getElementById('ageRadar'));
+let radarOption = {
+    title: {
+        text: '人口年龄结构',
+        left: 'center',
+        top: 5, 
+        textStyle: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+    },
+    tooltip: { trigger: 'item' },
+    radar: {
+        center: ['50%', '60%'], 
+        radius: '55%', 
+        indicator: [
+            { name: '0-14岁', max: 30 },
+            { name: '15-34岁', max: 35 },
+            { name: '35-59岁', max: 40 },
+            { name: '60-74岁', max: 25 },
+            { name: '75岁以上', max: 10 }
+        ],
+        axisLine: { lineStyle: { color: 'rgba(0,192,255,0.4)' } },
+        splitLine: { lineStyle: { color: 'rgba(0,192,255,0.2)' } },
+        axisName: { color: '#fff', fontSize: 12, padding: 5 },
+        splitArea: { show: false }
+    },
+    series: [{
+        type: 'radar',
+        data: [{
+            value: [17.6, 24.5, 33.2, 18.5, 6.2],
+            name: '年龄占比(%)',
+            areaStyle: { color: 'rgba(0,192,255,0.3)' },
+            lineStyle: { color: '#00c0ff', width: 2 },
+            itemStyle: { color: '#26f0ff', borderColor: '#fff', borderWidth: 2 },
+            symbol: 'circle',
+            symbolSize: 8
+        }]
+    }]
+};
+ageRadar.setOption(radarOption);
+
+window.addEventListener('resize',()=>{
+    lineChart.resize();
+    rankBar.resize();
+    mapChart.resize();
+    cityPie.resize();
+    ageRadar.resize();
+});
+
+    </script>
+</body>
+</html>
