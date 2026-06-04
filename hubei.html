@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>湖北省人口数据可视化大屏</title>
-    <!-- 引入ECharts -->
+    <!-- 引入ECharts & 湖北省地图 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@4.7.0/map/js/province/hubei.js"></script>
     <style>
 * {
     margin: 0;
@@ -255,34 +256,7 @@ var heatmapScatterData = [
 var mapChart = echarts.init(document.getElementById('hubeiMap'));
 var isHeatmap = false;
 
-// 多源加载湖北省地图GeoJSON，依次尝试三个CDN
-var hubeiMapUrls = [
-    'https://geo.datav.aliyun.com/areas_v3/bound/420000_full.json',
-    'https://file.geojson.cn/china/1.6.3/420000.json',
-    'https://echarts-www.cdn.bcebos.com/zh/asset/map/json/hubei.json'
-];
-
-function loadHubeiMap(urls, index) {
-    if (index >= urls.length) {
-        console.error('所有地图数据源均加载失败');
-        document.getElementById('hubeiMap').innerHTML = '<p style="color:#ff6666;text-align:center;padding-top:40px;">地图数据加载失败，请检查网络连接</p>';
-        return;
-    }
-    fetch(urls[index])
-        .then(function(response) {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return response.json();
-        })
-        .then(function(geoJson) {
-            echarts.registerMap('hubei', geoJson);
-            renderMap();
-        })
-        .catch(function(err) {
-            console.warn('地图源' + (index+1) + '加载失败:', err.message, '，尝试备用源...');
-            loadHubeiMap(urls, index + 1);
-        });
-}
-loadHubeiMap(hubeiMapUrls, 0);
+renderMap();
 
 function renderMap() {
     var mapOption = {
@@ -302,27 +276,19 @@ function renderMap() {
             }
         },
         visualMap: { 
-            type:'continuous',
             min: 0, 
             max: 1400, 
             left: 10, 
             bottom: 10, 
             text: ['高','低'], 
             textStyle: { color: '#fff' },
-            inRange: { color: ['#00c0ff','#081838'] },
+            color: ['#00c0ff','#081838'],
             show: true
         },
         series: [{
             type: 'map',
-            map: 'hubei',
+            map: '湖北',
             roam: false,
-            data: hubeiCityData,
-            itemStyle: {
-            areaColor: '#081838',
-            borderColor:'rgba(0,192,255,0.5)',
-            borderWidth:1
-            },
-
             label: { 
                 show: true, 
                 color: '#fff', 
@@ -376,7 +342,7 @@ function renderHeatmap() {
             }
         },
         geo: {
-            map: 'hubei',
+            map: '湖北',
             roam: false,
             label: { 
                 show: true, 
